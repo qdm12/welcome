@@ -2,7 +2,11 @@
     "name": "Welcome Dev",
     "dockerFile": "Dockerfile",
     "extensions": [
-        "ms-vscode.go"
+        "ms-vscode.go",
+        "softwaredotcom.swdc-vscode",
+        "davidanson.vscode-markdownlint",
+        "shardulm94.trailing-spaces",
+        "IBM.output-colorizer"
     ],
     "settings": {
         "go.gopath": "/go",

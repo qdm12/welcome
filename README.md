@@ -9,9 +9,14 @@ It checks and displays several things
 1. The date and time
 1. The server uptime
 1. The total RAM and CPU usage
-1. The capacity left of all ZFS volumes
-1. The Docker and Docker-Compose versions
-1. The number of containers running and processes
+1. For all ZFS volumes
+    - Capacity left in %
+    - Health status
+    - Data data errors
+1. Docker
+    - Docker and Docker-Compose versions
+    - Number of containers running
+    - Unhealthy and restarting containers as warnings
 1. The hostname, LAN ip address, and public IP address (using duckduckgo.com)
 1. Checks multiple websites are up
 
