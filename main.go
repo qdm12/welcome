@@ -79,7 +79,18 @@ func main() {
 		fmt.Println(strings.Join(capacities, " | "))
 	}
 
-	// TODO disk usage without ZFS
+	// Partition information
+	partitionsUsage, err := hardware.GetPartitionsUsage()
+	if err != nil {
+		display.Error("%s", err)
+	} else {
+		ss := []string{}
+		for fs, use := range partitionsUsage {
+			ss = append(ss, fmt.Sprintf("%s %d%%", fs, use))
+		}
+		s := strings.Join(ss, " | ")
+		fmt.Println(s)
+	}
 
 	// OS information
 	processes := hardware.GetProcesses()
