@@ -19,10 +19,8 @@
         "--security-opt",
         "seccomp=unconfined",
         // Linux
-        // "-v", "$HOME/.ssh/id_rsa:/home/vscode/.ssh/id_rsa:ro",
+        // "-v", "$HOME/.ssh:/home/vscode/.ssh:ro",
         // Windows
-        // "v", "${env:HOME}/.ssh/id_rsa:/home/vscode/.ssh/id_rsa:ro"
-        "-v",
-        "${env:HOME}/.ssh:/home/vscode/.ssh:ro"
+        "-v", "${env:HOME}/.ssh:/home/vscode/.ssh:ro"
     ]
 }
