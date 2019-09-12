@@ -22,7 +22,6 @@ func main() {
 	hostname, err := terminal.RunCommand("hostname")
 	if err != nil {
 		display.Error("Cannot get hostname: %s", err)
-		hostname = "?"
 	}
 	fmt.Println(display.GetRandomAsciiArt(hostname))
 
