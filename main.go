@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -19,6 +20,15 @@ var websitesToCheck = []string{
 }
 
 func main() {
+	CHECKNETWORK := false
+	CHECKCOMPOSE := false
+	for _, arg := range os.Args[1:len(os.Args)] {
+		if arg == "--network" || arg == "-n" {
+			CHECKNETWORK = true
+		} else if arg == "--compose" {
+			CHECKCOMPOSE = true
+		}
+	}
 	hostname, err := terminal.RunCommand("hostname")
 	if err != nil {
 		display.Error("Cannot get hostname: %s", err)
@@ -71,40 +81,50 @@ func main() {
 
 	// TODO disk usage without ZFS
 
+	// OS information
+	processes := hardware.GetProcesses()
+	fmt.Printf("%d processes running\n", processes)
+
 	// Docker
 	dockerInstalled := docker.IsDockerInstalled()
 	if !dockerInstalled {
 		display.Error("Docker is not installed")
 	}
-	dockerRunning := docker.IsDockerRunning()
-	if !dockerRunning {
-		display.Error("Docker is not running")
-	}
-	// TODO Get RAM and CPU usage of Docker containers (SLOW, do in goroutine)
-	// dockerStats, _ := terminal.RunCommand("docker", "stats", "--no-stream", "--format", "'{{.MemUsage}}'")
-
-	dockerComposeInstalled := docker.IsDockerComposeInstalled()
-	if !dockerComposeInstalled {
-		display.Warning("Docker Compose is not installed")
-	}
-
-	dockerVersion := docker.GetDockerVersion()
-	dockerComposeVersion := docker.GetDockerComposeVersion()
-	fmt.Printf("Docker %s | Compose %s\n", dockerVersion, dockerComposeVersion)
-
-	processes := hardware.GetProcesses()
-	if !dockerRunning {
-		fmt.Printf("%d processes\n", processes)
-	} else {
-		containersCount, err := docker.CountContainers()
-		if err != nil {
-			display.Error("Cannot count containers: %s", err)
-			fmt.Printf("%d processes\n", processes)
-		} else {
-			fmt.Printf("%d containers | %d processes\n", containersCount, processes)
+	dockerRunning := false
+	if dockerInstalled {
+		dockerRunning = docker.IsDockerRunning()
+		if !dockerRunning {
+			display.Error("Docker is not running")
 		}
 	}
 
+	// TODO Get RAM and CPU usage of Docker containers (SLOW, do in goroutine)
+	// dockerStats, _ := terminal.RunCommand("docker", "stats", "--no-stream", "--format", "'{{.MemUsage}}'")
+
+	dockerData := []string{}
+	dockerVersion := docker.GetDockerVersion()
+	dockerData = append(dockerData, "Docker "+dockerVersion)
+	if dockerRunning {
+		containersCount, err := docker.CountContainers()
+		if err != nil {
+			display.Error("Cannot count containers: %s", err)
+		} else {
+			dockerData = append(dockerData, fmt.Sprintf("%d containers", containersCount))
+		}
+	}
+	if CHECKCOMPOSE {
+		if !docker.IsDockerComposeInstalled() {
+			display.Warning("Docker-Compose is not installed")
+		} else {
+			dockerComposeVersion := docker.GetDockerComposeVersion()
+			if err != nil {
+				display.Error("%s", err)
+			} else {
+				dockerData = append(dockerData, "Compose "+dockerComposeVersion)
+			}
+		}
+	}
+	fmt.Println(strings.Join(dockerData, " | "))
 	if dockerRunning {
 		containersNotRunning, err := docker.IsContainerRunning("dns", "ddns", "sftp", "samba")
 		if err != nil {
@@ -123,18 +143,25 @@ func main() {
 	}
 
 	// Networking
+	netData := []string{hostname}
 	privateIP, err := network.GetOutboundIP()
 	if err != nil {
 		display.Error("Cannot get private IP address: %s", err)
 	}
-	publicIP, err := network.GetPublicIP()
-	if err != nil {
-		display.Error("Cannot get public IP address: %s", err)
+	netData = append(netData, privateIP)
+	if CHECKNETWORK {
+		publicIP, err := network.GetPublicIP()
+		if err != nil {
+			display.Error("Cannot get public IP address: %s", err)
+		}
+		netData = append(netData, publicIP)
 	}
-	fmt.Printf("%s | %s | %s\n", hostname, privateIP, publicIP)
+	fmt.Println(strings.Join(netData, " | "))
 
-	errors := network.CheckMultipleHTTPConnections(websitesToCheck)
-	for _, err := range errors {
-		display.Warning("%s", err)
+	if CHECKNETWORK {
+		errors := network.CheckMultipleHTTPConnections(websitesToCheck)
+		for _, err := range errors {
+			display.Warning("%s", err)
+		}
 	}
 }
