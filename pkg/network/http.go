@@ -7,7 +7,7 @@ import (
 )
 
 func CheckMultipleHTTPConnections(URLs []string) (errors []error) {
-	httpClient := &http.Client{Timeout: time.Second}
+	httpClient := &http.Client{Timeout: 300 * time.Millisecond}
 	chErr := make(chan error)
 	for i := range URLs {
 		URL := URLs[i]
