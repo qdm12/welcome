@@ -28,7 +28,7 @@ It checks and displays several things
 1. Build for Linux on an amd64 CPU with
 
     ```sh
-    GOOS=linux GOARCH=amd64 go build -ldflags="-s -w"
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w"
     ```
 
 1. You can then copy `welcome` to your server at `~` and add `./welcome` to your *.zshrc* or *.bashrc* in example.
