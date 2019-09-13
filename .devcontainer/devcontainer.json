@@ -18,9 +18,6 @@
         "--cap-add=SYS_PTRACE",
         "--security-opt",
         "seccomp=unconfined",
-        // Linux
-        // "-v", "$HOME/.ssh:/home/vscode/.ssh:ro",
-        // Windows
         "-v", "${env:HOME}/.ssh:/home/vscode/.ssh:ro"
     ]
 }
