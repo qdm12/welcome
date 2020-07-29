@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"strings"
@@ -56,13 +57,7 @@ func _main(ctx context.Context) int {
 		}
 	}()
 
-	// Hostname
-	hostname, err := cmd.Run(ctx, "hostname")
-	if err != nil {
-		display.Error("Cannot get hostname: %s", err)
-	} else {
-		fmt.Println(display.FormatRandomASCIIArt(hostname))
-	}
+	hostname(display)
 
 	// Time and uptime
 	t := time.Now().Format("2006-01-02 15:04:05")
@@ -95,6 +90,18 @@ func _main(ctx context.Context) int {
 		return 1
 	}
 	return 0
+}
+
+func hostname(display display.Display) {
+	bytes, err := ioutil.ReadFile("/proc/sys/kernel/hostname")
+	if err != nil {
+		display.Error("Cannot get hostname: %s", err)
+		return
+	}
+	hostname := string(bytes)
+	hostname = strings.TrimSpace(hostname)
+	hostname = strings.TrimSuffix(hostname, "\n")
+	fmt.Println(display.FormatRandomASCIIArt(hostname))
 }
 
 func zfs(ctx context.Context, hardware hardware.Hardware, display display.Display) {
