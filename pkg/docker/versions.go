@@ -1,17 +1,17 @@
 package docker
 
-import "welcome/pkg/terminal"
+import "context"
 
-func GetDockerVersion() string {
-	version, err := terminal.RunCommand("docker", "version", "--format", "'{{.Server.Version}}'")
+func (d *docker) Version(ctx context.Context) string {
+	version, err := d.commander.Run(ctx, "docker", "version", "--format", "'{{.Server.Version}}'")
 	if err != nil {
 		return "N/A"
 	}
 	return version
 }
 
-func GetDockerComposeVersion() string {
-	version, err := terminal.RunCommand("docker-compose", "version", "--short")
+func (d *docker) ComposeVersion(ctx context.Context) string {
+	version, err := d.commander.Run(ctx, "docker-compose", "version", "--short")
 	if err != nil {
 		return "N/A"
 	}

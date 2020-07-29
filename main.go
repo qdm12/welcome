@@ -1,88 +1,140 @@
 package main
 
 import (
+	"context"
+	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
-	"welcome/pkg/display"
-	"welcome/pkg/docker"
-	"welcome/pkg/hardware"
-	"welcome/pkg/network"
-	"welcome/pkg/terminal"
+	"github.com/qdm12/golibs/command"
+	"github.com/qdm12/welcome/pkg/display"
+	"github.com/qdm12/welcome/pkg/docker"
+	"github.com/qdm12/welcome/pkg/hardware"
+	"github.com/qdm12/welcome/pkg/network"
 )
 
-var websitesToCheck = []string{
-	"https://1.1.1.1",
-	"https://qqq.ninja",
-	"https://lux.qqq.ninja",
+func main() {
+	os.Exit(_main(context.Background()))
 }
 
-func main() {
-	CHECKNETWORK := false
-	CHECKCOMPOSE := false
-	for _, arg := range os.Args[1:len(os.Args)] {
-		if arg == "--network" || arg == "-n" {
-			CHECKNETWORK = true
-		} else if arg == "--compose" {
-			CHECKCOMPOSE = true
+func _main(ctx context.Context) int {
+	networkFlag := flag.Bool("network", false, "verify network connectivity")
+	composeFlag := flag.Bool("compose", false, "show docker-compose version (slow)")
+	requiredContainerNamesFlag := flag.String("requiredContainers", "dns,ddns", "comma separated list of required running container names to check for")
+	websitesToCheckFlag := flag.String("websitesToCheck", "https://qqq.ninja,https://1.1.1.1", "comma separated list of websites to check, only enabled if --network is specified")
+	flag.Parse()
+
+	requiredContainerNames := strings.Split(*requiredContainerNamesFlag, ",")
+	websitesToCheck := strings.Split(*websitesToCheckFlag, ",")
+
+	display := display.New()
+	cmd := command.NewCommander()
+	docker := docker.New(cmd)
+	hardware := hardware.New(cmd, "/var/lib/docker") // TODO docker root path auto-detection
+	network := network.New()
+
+	signalsCh := make(chan os.Signal, 1)
+	signal.Notify(signalsCh,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		os.Interrupt,
+	)
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	go func() {
+		select {
+		case <-ctx.Done():
+		case signal := <-signalsCh:
+			display.Warning("Caught OS signal %s, exiting...", signal)
+			cancel()
 		}
-	}
-	hostname, err := terminal.RunCommand("hostname")
+	}()
+
+	// Hostname
+	hostname, err := cmd.Run(ctx, "hostname")
 	if err != nil {
 		display.Error("Cannot get hostname: %s", err)
+	} else {
+		fmt.Println(display.FormatRandomASCIIArt(hostname))
 	}
-	fmt.Println(display.GetRandomAsciiArt(hostname))
 
 	// Time and uptime
 	t := time.Now().Format("2006-01-02 15:04:05")
-	upTime := hardware.GetUptime()
-	fmt.Printf("%s | Up %s\n", t, upTime)
+	fmt.Printf("%s | Up %s\n", t, hardware.Uptime())
 
 	// RAM and CPU usage
-	UsageRam := hardware.GetRAMUsage()
-	UsageCpu, err := hardware.GetCPUUsage()
+	UsageRAM := hardware.RAMPercentUsage()
+	UsageCPU, err := hardware.CPUPercentUsage()
 	if err != nil {
-		display.Error("%s", err)
-		UsageCpu = -1
+		display.Error(err)
+		UsageCPU = -1
 	}
-	fmt.Printf("RAM %d%% | CPU %d%%\n", UsageRam, UsageCpu)
+	fmt.Printf("RAM %d%% | CPU %d%%\n", UsageRAM, UsageCPU)
 
-	// ZFS
-	ZpoolIsInstalled := hardware.IsZpoolInstalled()
-	if ZpoolIsInstalled {
-		capacities := []string{}
-		pools, err := hardware.GetPools()
+	zfs(ctx, hardware, display)
+
+	partitions(ctx, hardware, display)
+
+	// OS information
+	processesCount := hardware.ProcessesCount()
+	fmt.Printf("%d processes running\n", processesCount)
+
+	doDocker(ctx, docker, display, *composeFlag, requiredContainerNames)
+
+	if *networkFlag {
+		doNetwork(display, network, websitesToCheck)
+	}
+
+	if ctx.Err() != nil {
+		return 1
+	}
+	return 0
+}
+
+func zfs(ctx context.Context, hardware hardware.Hardware, display display.Display) {
+	if !hardware.IsZpoolInstalled(ctx) {
+		return
+	}
+	capacities := []string{}
+	pools, err := hardware.GetPools(ctx)
+	if err != nil {
+		display.Error(err)
+	}
+	for _, pool := range pools {
+		health, err := hardware.GetPoolHealth(ctx, pool)
 		if err != nil {
-			display.Error("%s", err)
+			display.Error(err)
+		} else if health != "" {
+			display.Warning("ZFS pool %s is %s", pool, health)
 		}
-		for _, pool := range pools {
-			health, err := hardware.GetPoolHealth(pool)
-			if err != nil {
-				display.Error("%s", err)
-			} else if health != "" {
-				display.Warning("ZFS pool %s is %s", pool, health)
-			}
-			errors, err := hardware.GetPoolErrors(pool)
-			if err != nil {
-				display.Error("%s", err)
-			} else if errors != "" {
-				display.Warning("ZFS pool %s: %s", pool, errors)
-			}
-			capacity, err := hardware.GetPoolCapacity(pool)
-			if err != nil {
-				display.Error("%s", err)
-			}
-			capacities = append(capacities, fmt.Sprintf("%s %d%%", pool, capacity))
+		errors, err := hardware.GetPoolErrors(ctx, pool)
+		if err != nil {
+			display.Error(err)
+		} else if errors != "" {
+			display.Warning("ZFS pool %s: %s", pool, errors)
 		}
-		fmt.Println(strings.Join(capacities, " | "))
+		capacity, err := hardware.GetPoolCapacity(ctx, pool)
+		if err != nil {
+			display.Error(err)
+		}
+		capacities = append(capacities, fmt.Sprintf("%s %d%%", pool, capacity))
 	}
+	fmt.Println(strings.Join(capacities, " | "))
+}
 
-	// Partition information
-	partitionsUsage, err := hardware.GetPartitionsUsage()
+func partitions(ctx context.Context, hardware hardware.Hardware, display display.Display) {
+	partitionsUsage, warnings, err := hardware.PartitionsUsage(ctx)
+	for _, warning := range warnings {
+		display.Warning(warning)
+	}
 	if err != nil {
-		display.Error("%s", err)
+		display.Error(err)
 	} else {
 		ss := []string{}
 		for fs, use := range partitionsUsage {
@@ -91,88 +143,76 @@ func main() {
 		s := strings.Join(ss, " | ")
 		fmt.Println(s)
 	}
+}
 
-	// OS information
-	processes := hardware.GetProcesses()
-	fmt.Printf("%d processes running\n", processes)
-
-	// Docker
-	dockerInstalled := docker.IsDockerInstalled()
-	if !dockerInstalled {
+func doDocker(ctx context.Context, docker docker.Docker, display display.Display, composeCheck bool, requiredContainerNames []string) {
+	if !docker.IsInstalled(ctx) {
 		display.Error("Docker is not installed")
-	}
-	dockerRunning := false
-	if dockerInstalled {
-		dockerRunning = docker.IsDockerRunning()
-		if !dockerRunning {
-			display.Error("Docker is not running")
-		}
+		return
+	} else if !docker.IsRunning(ctx) {
+		display.Error("Docker is not running")
+		return
 	}
 
-	// TODO Get RAM and CPU usage of Docker containers (SLOW, do in goroutine)
-	// dockerStats, _ := terminal.RunCommand("docker", "stats", "--no-stream", "--format", "'{{.MemUsage}}'")
+	// TODO Get RAM and CPU usage of Docker containers using Docker Go SDK
 
 	dockerData := []string{}
-	dockerVersion := docker.GetDockerVersion()
+	dockerVersion := docker.Version(ctx)
 	dockerData = append(dockerData, "Docker "+dockerVersion)
-	if dockerRunning {
-		containersCount, err := docker.CountContainers()
-		if err != nil {
-			display.Error("Cannot count containers: %s", err)
-		} else {
-			dockerData = append(dockerData, fmt.Sprintf("%d containers", containersCount))
-		}
+	containersCount, err := docker.CountContainers(ctx)
+	if err != nil {
+		display.Error("Cannot count containers: %s", err)
+	} else {
+		dockerData = append(dockerData, fmt.Sprintf("%d containers", containersCount))
 	}
-	if CHECKCOMPOSE {
-		if !docker.IsDockerComposeInstalled() {
+	if composeCheck {
+		if !docker.IsComposeInstalled(ctx) {
 			display.Warning("Docker-Compose is not installed")
 		} else {
-			dockerComposeVersion := docker.GetDockerComposeVersion()
+			dockerComposeVersion := docker.ComposeVersion(ctx)
 			if err != nil {
-				display.Error("%s", err)
+				display.Error("Cannot get docker-compose version: %s", err)
 			} else {
 				dockerData = append(dockerData, "Compose "+dockerComposeVersion)
 			}
 		}
 	}
 	fmt.Println(strings.Join(dockerData, " | "))
-	if dockerRunning {
-		containersNotRunning, err := docker.IsContainerRunning("dns", "ddns", "sftp", "samba")
-		if err != nil {
-			display.Error("Cannot check for running containers: %s", err)
-		}
-		for _, container := range containersNotRunning {
-			display.Warning("Container %s is not running", container)
-		}
-		badStatus, err := docker.GetBadContainers()
-		if err != nil {
-			display.Error("Cannot get bad containers: %s", err)
-		}
-		for _, status := range badStatus {
-			display.Warning(status)
-		}
-	}
 
-	// Networking
-	netData := []string{hostname}
+	containersNotRunning, err := docker.AreContainerRunning(ctx, requiredContainerNames)
+	if err != nil {
+		display.Error(err)
+	}
+	for _, container := range containersNotRunning {
+		display.Warning("Container %s is not running", container)
+	}
+	badStatus, err := docker.BadContainers(ctx)
+	if err != nil {
+		display.Error(err)
+	}
+	for _, status := range badStatus {
+		display.Warning(status)
+	}
+}
+
+func doNetwork(display display.Display, network network.Network, websitesToCheck []string) {
+	var netData []string
 	privateIP, err := network.GetOutboundIP()
 	if err != nil {
-		display.Error("Cannot get private IP address: %s", err)
+		display.Error(err)
+	} else {
+		netData = append(netData, privateIP)
 	}
-	netData = append(netData, privateIP)
-	if CHECKNETWORK {
-		publicIP, err := network.GetPublicIP()
-		if err != nil {
-			display.Error("Cannot get public IP address: %s", err)
-		}
+	publicIP, err := network.GetPublicIP()
+	if err != nil {
+		display.Error(err)
+	} else {
 		netData = append(netData, publicIP)
 	}
 	fmt.Println(strings.Join(netData, " | "))
 
-	if CHECKNETWORK {
-		errors := network.CheckMultipleHTTPConnections(websitesToCheck)
-		for _, err := range errors {
-			display.Warning("%s", err)
-		}
+	errors := network.CheckMultipleHTTPConnections(websitesToCheck)
+	for _, err := range errors {
+		display.Warning(err)
 	}
 }

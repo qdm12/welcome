@@ -2,44 +2,35 @@ package network
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
-	"regexp"
-	"time"
+	"strings"
 )
 
-const regexIP = `(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}`
-
-var searchIP = regexp.MustCompile(regexIP).FindString
-
 // Get preferred outbound ip of this machine
-func GetOutboundIP() (IP string, err error) {
+// TODO find from routing table
+func (n *network) GetOutboundIP() (ip string, err error) {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot get private IP address: %w", err)
 	}
 	defer conn.Close()
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	return localAddr.IP.String(), nil
 }
 
-func GetPublicIP() (IP string, err error) {
-	httpClient := &http.Client{Timeout: time.Second}
-	response, err := httpClient.Get("https://duckduckgo.com?q=ip")
+func (n *network) GetPublicIP() (ip string, err error) {
+	content, status, err := n.client.GetContent("https://diagnostic.opendns.com/myip")
 	if err != nil {
-		return "", err
-	} else if response.StatusCode != 200 {
-		return "", fmt.Errorf("https://duckduckgo.com?q=ip failed with status code %s", response.Status)
+		return "", fmt.Errorf("cannot get public IP address: %w", err)
+	} else if status != http.StatusOK {
+		return "", fmt.Errorf("cannot get public IP address: HTTP status code %d", status)
 	}
-	content, err := ioutil.ReadAll(response.Body)
-	response.Body.Close()
-	if err != nil {
-		return "", err
+	ip = strings.TrimSpace(string(content))
+	ip = strings.TrimPrefix(ip, "\n")
+	ip = strings.TrimSuffix(ip, "\n")
+	if ip == "" {
+		return "", fmt.Errorf("Public IP address not found")
 	}
-	IP = searchIP(string(content))
-	if IP == "" {
-		return "", fmt.Errorf("Public IP not found")
-	}
-	return IP, nil
+	return ip, nil
 }

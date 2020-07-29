@@ -1,27 +1,20 @@
 package docker
 
-import "welcome/pkg/terminal"
+import (
+	"context"
+)
 
-func IsDockerInstalled() bool {
-	_, err := terminal.RunCommand("docker")
-	if err != nil {
-		return false
-	}
-	return true
+func (d *docker) IsInstalled(ctx context.Context) (installed bool) {
+	_, err := d.commander.Run(ctx, "docker")
+	return err == nil
 }
 
-func IsDockerRunning() bool {
-	_, err := terminal.RunCommand("docker", "ps")
-	if err != nil {
-		return false
-	}
-	return true
+func (d *docker) IsRunning(ctx context.Context) (running bool) {
+	_, err := d.commander.Run(ctx, "docker", "ps")
+	return err == nil
 }
 
-func IsDockerComposeInstalled() bool {
-	_, err := terminal.RunCommand("docker-compose", "version")
-	if err != nil {
-		return false
-	}
-	return true
+func (d *docker) IsComposeInstalled(ctx context.Context) (installed bool) {
+	_, err := d.commander.Run(ctx, "docker-compose", "version")
+	return err == nil
 }

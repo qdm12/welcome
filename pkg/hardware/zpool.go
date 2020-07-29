@@ -1,32 +1,31 @@
 package hardware
 
 import (
+	"context"
+	"fmt"
 	"strconv"
-	"welcome/pkg/terminal"
-	"welcome/pkg/utils"
+
+	"github.com/qdm12/welcome/pkg/utils"
 )
 
-func IsZpoolInstalled() bool {
-	_, err := terminal.RunCommand("zpool", "version")
-	if err != nil {
-		return false
-	}
-	return true
+func (hw *hardware) IsZpoolInstalled(ctx context.Context) bool {
+	_, err := hw.cmd.Run(ctx, "zpool", "version")
+	return err == nil
 }
 
-func GetPools() (poolNames []string, err error) {
-	output, err := terminal.RunCommand("zpool", "list", "-o", "name", "-H")
+func (hw *hardware) GetPools(ctx context.Context) (poolNames []string, err error) {
+	output, err := hw.cmd.Run(ctx, "zpool", "list", "-o", "name", "-H")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot list zpools: %w", err)
 	}
 	poolNames = utils.StringToLines(output)
 	return poolNames, nil
 }
 
-func GetPoolHealth(poolName string) (health string, err error) {
-	health, err = terminal.RunCommand("zpool", "list", poolName, "-o", "health", "-H")
+func (hw *hardware) GetPoolHealth(ctx context.Context, poolName string) (health string, err error) {
+	health, err = hw.cmd.Run(ctx, "zpool", "list", poolName, "-o", "health", "-H")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot get zpool %s health: %w", poolName, err)
 	}
 	if health == "ONLINE" {
 		return "", nil
@@ -34,10 +33,10 @@ func GetPoolHealth(poolName string) (health string, err error) {
 	return health, nil
 }
 
-func GetPoolErrors(poolName string) (errors string, err error) {
-	poolStatus, err := terminal.RunCommand("zpool", "status", poolName)
+func (hw *hardware) GetPoolErrors(ctx context.Context, poolName string) (errors string, err error) {
+	poolStatus, err := hw.cmd.Run(ctx, "zpool", "status", poolName)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot get zpool %s status: %w", poolName, err)
 	}
 	lines := utils.StringToLines(poolStatus)
 	errorsLine := lines[len(lines)-1]
@@ -48,12 +47,15 @@ func GetPoolErrors(poolName string) (errors string, err error) {
 	return errors, nil
 }
 
-func GetPoolCapacity(poolName string) (capacity int, err error) {
-	output, err := terminal.RunCommand("zpool", "list", poolName, "-o", "capacity", "-H")
+func (hw *hardware) GetPoolCapacity(ctx context.Context, poolName string) (capacity int, err error) {
+	output, err := hw.cmd.Run(ctx, "zpool", "list", poolName, "-o", "capacity", "-H")
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("cannot get zpool %s capacity: %w", poolName, err)
 	}
 	output = output[:len(output)-1] // removes % sign
 	capacity, err = strconv.Atoi(output)
-	return capacity, err
+	if err != nil {
+		return 0, fmt.Errorf("cannot get zpool %s capacity: %w", poolName, err)
+	}
+	return capacity, nil
 }

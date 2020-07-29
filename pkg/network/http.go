@@ -3,38 +3,34 @@ package network
 import (
 	"fmt"
 	"net/http"
-	"time"
+
+	netlib "github.com/qdm12/golibs/network"
 )
 
-func CheckMultipleHTTPConnections(URLs []string) (errors []error) {
-	httpClient := &http.Client{Timeout: 300 * time.Millisecond}
+func (n *network) CheckMultipleHTTPConnections(urls []string) (errors []error) {
 	chErr := make(chan error)
-	for i := range URLs {
-		URL := URLs[i]
-		go func() {
-			chErr <- checkHTTPConnection(httpClient, URL)
-		}()
+	for i := range urls {
+		go func(url string) {
+			chErr <- checkHTTPConnection(n.client, url)
+		}(urls[i])
 	}
-	N := len(URLs)
-	for N > 0 {
-		select {
-		case err := <-chErr:
-			if err != nil {
-				errors = append(errors, err)
-			}
-			N--
+	for range urls {
+		err := <-chErr
+		if err != nil {
+			errors = append(errors, err)
 		}
 	}
 	close(chErr)
 	return errors
 }
 
-func checkHTTPConnection(httpClient *http.Client, URL string) (err error) {
-	response, err := httpClient.Get(URL)
+func checkHTTPConnection(client netlib.Client, url string) (err error) {
+	_, status, err := client.GetContent(url)
 	if err != nil {
 		return err
-	} else if response.StatusCode != 200 {
-		return fmt.Errorf("connectivity to %s failed: HTTP status code is %s", URL, response.Status)
+	}
+	if status != http.StatusOK {
+		return fmt.Errorf("connectivity to %s failed: HTTP status code is %d", url, status)
 	}
 	return nil
 }

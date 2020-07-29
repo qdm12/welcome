@@ -1,34 +1,34 @@
 package hardware
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
-	"welcome/pkg/display"
-	"welcome/pkg/terminal"
-	"welcome/pkg/utils"
+
+	"github.com/qdm12/welcome/pkg/utils"
 )
 
-func GetPartitionsUsage() (partitionsUsage map[string]int, err error) {
-	lines, err := getDrivesRawMetadata()
+func (hw *hardware) PartitionsUsage(ctx context.Context) (partitionsUsage map[string]int, warnings []string, err error) {
+	lines, err := hw.getDrivesRawMetadata(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	partitionsUsage = make(map[string]int)
-	data := processPartitionsRawMetadata(lines)
-	for i := range data {
-		partitionsUsage[data[i].filesystem] = data[i].use
+	partitions, warnings := hw.processPartitionsRawMetadata(lines)
+	partitionsUsage = make(map[string]int, len(partitions))
+	for _, partition := range partitions {
+		partitionsUsage[partition.filesystem] = partition.use
 	}
-	return partitionsUsage, nil
+	return partitionsUsage, warnings, nil
 }
 
-func getDrivesRawMetadata() (lines []string, err error) {
-	output, err := terminal.RunCommand("df", "-T")
+func (hw *hardware) getDrivesRawMetadata(ctx context.Context) (lines []string, err error) {
+	output, err := hw.cmd.Run(ctx, "df", "-T")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot get drives raw metadata: %w", err)
 	}
 	lines = utils.StringToLines(output)
-	return lines[1:len(lines)], nil
+	return lines[1:], nil
 }
 
 type partitionData struct {
@@ -38,43 +38,43 @@ type partitionData struct {
 	mountedOn     string
 }
 
-func processPartitionsRawMetadata(lines []string) (data []partitionData) {
+func (hw *hardware) processPartitionsRawMetadata(lines []string) (partitions []partitionData, warnings []string) {
 	for _, line := range lines {
-		if partitionRawDataShouldBeSkipped(line) {
+		if partitionRawDataShouldBeSkipped(line, []string{hw.dockerRootPath}) {
 			continue
 		}
-		d, err := makePartitionData(line)
+		partition, err := makePartitionData(line)
 		if err != nil {
-			display.Error("%s", err)
+			warnings = append(warnings, fmt.Sprintf("Cannot extract partition data from %q: %s", line, err))
 			continue
 		}
-		data = append(data, d)
+		partitions = append(partitions, partition)
 	}
-	return data
+	return partitions, warnings
 }
 
 func makePartitionData(line string) (data partitionData, err error) {
 	columns := strings.Fields(line)
 	if len(columns) < 7 {
-		return data, fmt.Errorf("%s has less than 7 columns", line)
+		return data, fmt.Errorf("cannot extract partition information: %q has less than 7 columns", line)
 	}
 	data.filesystem = columns[0]
 	data.partitionType = columns[1]
 	percent := strings.TrimSuffix(columns[5], "%")
 	data.use, err = strconv.Atoi(percent)
 	if err != nil {
-		return data, err
+		return data, fmt.Errorf("cannot extract partition usage percent: %w", err)
 	}
 	data.mountedOn = columns[6]
 	return data, nil
 }
 
-func partitionRawDataShouldBeSkipped(line string) (skip bool) {
-	if len(line) == 0 {
-		return true
-	} else if strings.HasPrefix(line, "//") { // CIFS encryted share
-		return true
-	} else if strings.HasSuffix(line, "/boot/efi") { // ignore EFI mountpoint
+func partitionRawDataShouldBeSkipped(line string, ignoredMountPoints []string) (skip bool) {
+	CIFSEncryptedShare := strings.HasPrefix(line, "//")
+	isBootMountpoint := strings.HasSuffix(line, "/boot/efi") || strings.HasSuffix(line, "/boot") || strings.HasSuffix(line, "/efi")
+	isCIFS := strings.Contains(line, " cifs ")
+	switch {
+	case len(line) == 0, CIFSEncryptedShare, isBootMountpoint, isCIFS:
 		return true
 	}
 	columns := strings.Fields(line)
@@ -82,15 +82,17 @@ func partitionRawDataShouldBeSkipped(line string) (skip bool) {
 	if len(columns) > 1 {
 		partitionType = columns[1]
 	}
-	ignoredPartitionTypes := []string{"zfs", "devtmpfs", "tmpfs", "cifs", "overlay", "zfs"}
+	ignoredPartitionTypes := []string{"zfs", "devtmpfs", "tmpfs", "cifs", "overlay"}
 	for _, t := range ignoredPartitionTypes {
 		if partitionType == t {
 			return true
 		}
 	}
 	mountpoint := columns[len(columns)-1]
-	if strings.Contains(mountpoint, "/var/lib/docker") {
-		return true
+	for i := range ignoredMountPoints {
+		if strings.Contains(mountpoint, ignoredMountPoints[i]) {
+			return true
+		}
 	}
 	return false
 }
