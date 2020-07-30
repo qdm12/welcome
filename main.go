@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/signal"
+	"os/user"
 	"strings"
 	"syscall"
 	"time"
@@ -41,6 +42,13 @@ func _main(ctx context.Context) int {
 	}
 	hardware := hardware.New(cmd, "/var/lib/docker") // TODO docker root path auto-detection
 	network := network.New()
+
+	currentUser, err := user.Current()
+	if err != nil {
+		display.Error(err)
+		return 1
+	}
+	runningAsRoot := currentUser.Uid == "0"
 
 	signalsCh := make(chan os.Signal, 1)
 	signal.Notify(signalsCh,
@@ -78,7 +86,11 @@ func _main(ctx context.Context) int {
 
 	zfs(ctx, hardware, display)
 
-	partitions(ctx, hardware, display)
+	if runningAsRoot {
+		partitions(ctx, hardware, display)
+	} else {
+		display.Warning("ignoring partitions because you are not running as root")
+	}
 
 	// OS information
 	processesCount := hardware.ProcessesCount()
