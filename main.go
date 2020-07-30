@@ -34,7 +34,11 @@ func _main(ctx context.Context) int {
 
 	display := display.New()
 	cmd := command.NewCommander()
-	docker := docker.New(cmd)
+	docker, err := docker.New(cmd)
+	if err != nil {
+		display.Error(err)
+		return 1
+	}
 	hardware := hardware.New(cmd, "/var/lib/docker") // TODO docker root path auto-detection
 	network := network.New()
 
@@ -153,10 +157,7 @@ func partitions(ctx context.Context, hardware hardware.Hardware, display display
 }
 
 func doDocker(ctx context.Context, docker docker.Docker, display display.Display, composeCheck bool, requiredContainerNames []string) {
-	if !docker.IsInstalled(ctx) {
-		display.Error("Docker is not installed")
-		return
-	} else if !docker.IsRunning(ctx) {
+	if !docker.IsRunning(ctx) {
 		display.Error("Docker is not running")
 		return
 	}
@@ -193,12 +194,12 @@ func doDocker(ctx context.Context, docker docker.Docker, display display.Display
 	for _, container := range containersNotRunning {
 		display.Warning("Container %s is not running", container)
 	}
-	badStatus, err := docker.BadContainers(ctx)
+	badContainers, err := docker.BadContainers(ctx)
 	if err != nil {
 		display.Error(err)
 	}
-	for _, status := range badStatus {
-		display.Warning(status)
+	for name, status := range badContainers {
+		display.Warning("Container %s: %s", name, status)
 	}
 }
 

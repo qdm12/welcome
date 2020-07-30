@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-
-	"github.com/qdm12/welcome/pkg/utils"
 )
 
 func (hw *hardware) IsZpoolInstalled(ctx context.Context) bool {
@@ -18,7 +16,7 @@ func (hw *hardware) GetPools(ctx context.Context) (poolNames []string, err error
 	if err != nil {
 		return nil, fmt.Errorf("cannot list zpools: %w", err)
 	}
-	poolNames = utils.StringToLines(output)
+	poolNames = stringToLines(output)
 	return poolNames, nil
 }
 
@@ -38,7 +36,7 @@ func (hw *hardware) GetPoolErrors(ctx context.Context, poolName string) (errors 
 	if err != nil {
 		return "", fmt.Errorf("cannot get zpool %s status: %w", poolName, err)
 	}
-	lines := utils.StringToLines(poolStatus)
+	lines := stringToLines(poolStatus)
 	errorsLine := lines[len(lines)-1]
 	errors = errorsLine[8:]
 	if errors == "No known data errors" {

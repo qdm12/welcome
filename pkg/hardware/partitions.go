@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/qdm12/welcome/pkg/utils"
 )
 
 func (hw *hardware) PartitionsUsage(ctx context.Context) (partitionsUsage map[string]int, warnings []string, err error) {
@@ -27,7 +25,7 @@ func (hw *hardware) getDrivesRawMetadata(ctx context.Context) (lines []string, e
 	if err != nil {
 		return nil, fmt.Errorf("cannot get drives raw metadata: %w", err)
 	}
-	lines = utils.StringToLines(output)
+	lines = stringToLines(output)
 	return lines[1:], nil
 }
 

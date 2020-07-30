@@ -2,6 +2,7 @@ package hardware
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/c9s/goprocinfo/linux"
@@ -36,4 +37,21 @@ func New(cmd command.Commander, dockerRootPath string) Hardware {
 		readProcStat:   linux.ReadStat,
 		getSysInfo:     sysinfo.Get,
 	}
+}
+
+func stringToLines(s string) (lines []string) {
+	lines = strings.Split(s, "\n")
+	nonEmptyLines := 0
+	for _, line := range lines {
+		if len(line) > 0 {
+			nonEmptyLines++
+			if nonEmptyLines == 2 {
+				break
+			}
+		}
+	}
+	if nonEmptyLines < 2 {
+		return []string{s}
+	}
+	return lines
 }

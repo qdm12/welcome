@@ -5,36 +5,27 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/qdm12/welcome/pkg/utils"
+	"github.com/docker/docker/api/types"
 )
 
-func countNonEmptyLines(s string) (count int) {
-	lines := strings.Split(s, "\n")
-	for _, line := range lines {
-		if len(line) > 0 {
-			count++
-		}
-	}
-	return count
-}
-
 func (d *docker) CountContainers(ctx context.Context) (count int, err error) {
-	dockerPsNames, err := d.commander.Run(ctx, "docker", "ps", "--format", "'{{.Names}}'")
+	containers, err := d.client.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
 		return 0, fmt.Errorf("cannot list Docker containers: %w", err)
 	}
-	containersCount := countNonEmptyLines(dockerPsNames)
-	return containersCount, nil
+	return len(containers), err
 }
 
 func (d *docker) AreContainerRunning(ctx context.Context, requiredContainerNames []string) (containersNotRunning []string, err error) {
-	dockerPsNames, err := d.commander.Run(ctx, "docker", "ps", "--format", "'{{.Names}}'")
+	containers, err := d.client.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("cannot list Docker containers: %w", err)
 	}
 	containerNames := make(map[string]struct{})
-	for _, name := range utils.StringToLines(dockerPsNames) {
-		containerNames[name] = struct{}{}
+	for _, container := range containers {
+		for _, name := range container.Names {
+			containerNames[strings.TrimPrefix(name, "/")] = struct{}{}
+		}
 	}
 	for _, name := range requiredContainerNames {
 		if _, ok := containerNames[name]; !ok {
@@ -44,16 +35,23 @@ func (d *docker) AreContainerRunning(ctx context.Context, requiredContainerNames
 	return containersNotRunning, nil
 }
 
-func (d *docker) BadContainers(ctx context.Context) (badStatus []string, err error) {
-	dockerPsStatus, err := d.commander.Run(ctx, "docker", "ps", "--format", "'Container {{.Names}} is {{.Status}}'")
+func (d *docker) BadContainers(ctx context.Context) (containerNameToState map[string]string, err error) {
+	containers, err := d.client.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("cannot list Docker containers: %w", err)
 	}
-	allStatus := utils.StringToLines(dockerPsStatus)
-	for _, status := range allStatus {
-		if strings.Contains(status, "unhealthy") || strings.Contains(status, "restarting") {
-			badStatus = append(badStatus, status)
+	containerNameToState = map[string]string{}
+	for _, container := range containers {
+		containerName := strings.TrimPrefix(container.Names[0], "/")
+		lowercaseStatus := strings.ToLower(container.Status)
+		switch {
+		case strings.Contains(lowercaseStatus, "unhealthy"):
+			containerNameToState[containerName] = "unhealthy"
+		case strings.Contains(lowercaseStatus, "restarting"):
+			containerNameToState[containerName] = "restarting"
+		case !strings.HasPrefix(lowercaseStatus, "up "):
+			containerNameToState[containerName] = lowercaseStatus
 		}
 	}
-	return badStatus, nil
+	return containerNameToState, nil
 }

@@ -70,7 +70,6 @@ Usage of welcome:
     - Bandwidth download, then upload
     - Ping
     - Docker Stats
-- Use Docker API, see [this](https://docs.docker.com/develop/sdk/examples/)
 - ZFS
     - Use `zpool events`
     - Check scrub time

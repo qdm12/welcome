@@ -4,13 +4,8 @@ import (
 	"context"
 )
 
-func (d *docker) IsInstalled(ctx context.Context) (installed bool) {
-	_, err := d.commander.Run(ctx, "docker")
-	return err == nil
-}
-
 func (d *docker) IsRunning(ctx context.Context) (running bool) {
-	_, err := d.commander.Run(ctx, "docker", "ps")
+	_, err := d.client.Ping(ctx)
 	return err == nil
 }
 
