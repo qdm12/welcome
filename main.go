@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"os/signal"
 	"os/user"
@@ -41,7 +42,11 @@ func _main(ctx context.Context) int {
 		return 1
 	}
 	hardware := hardware.New(cmd, "/var/lib/docker") // TODO docker root path auto-detection
-	network := network.New()
+	network, err := network.New(net.DefaultResolver)
+	if err != nil {
+		display.Error(err)
+		return 1
+	}
 
 	currentUser, err := user.Current()
 	if err != nil {
@@ -99,7 +104,7 @@ func _main(ctx context.Context) int {
 	doDocker(ctx, docker, display, *composeFlag, requiredContainerNames)
 
 	if *networkFlag {
-		doNetwork(display, network, websitesToCheck)
+		doNetwork(ctx, display, network, websitesToCheck)
 	}
 
 	if ctx.Err() != nil {
@@ -215,15 +220,16 @@ func doDocker(ctx context.Context, docker docker.Docker, display display.Display
 	}
 }
 
-func doNetwork(display display.Display, network network.Network, websitesToCheck []string) {
+func doNetwork(ctx context.Context, display display.Display,
+	network network.NetworkInterface, websitesToCheck []string) {
 	var netData []string
-	privateIP, err := network.GetOutboundIP()
+	privateIP, err := network.OutboundIP(ctx)
 	if err != nil {
 		display.Error(err)
 	} else {
 		netData = append(netData, privateIP)
 	}
-	publicIP, err := network.GetPublicIP()
+	publicIP, err := network.PublicIP(ctx)
 	if err != nil {
 		display.Error(err)
 	} else {
@@ -231,8 +237,10 @@ func doNetwork(display display.Display, network network.Network, websitesToCheck
 	}
 	fmt.Println(strings.Join(netData, " | "))
 
-	errors := network.CheckMultipleHTTPConnections(websitesToCheck)
+	errors := network.Check(ctx, websitesToCheck)
 	for _, err := range errors {
-		display.Warning(err)
+		if err != nil {
+			display.Warning(err)
+		}
 	}
 }

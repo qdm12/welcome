@@ -23,8 +23,9 @@ type docker struct {
 	client    client.APIClient
 }
 
-func New(commander command.Commander) (d Docker, err error) {
-	dockerClient, err := client.NewEnvClient()
+func New(commander command.Commander) (
+	d Docker, err error) {
+	dockerClient, err := client.NewClientWithOpts()
 	if err != nil {
 		return nil, fmt.Errorf("cannot use Docker: %w", err)
 	}

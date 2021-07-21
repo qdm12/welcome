@@ -1,36 +1,32 @@
 package network
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net"
-	"net/http"
-	"strings"
+	"time"
 )
+
+var ErrPrivateIP = errors.New("cannot get private IP address")
 
 // Get preferred outbound ip of this machine
 // TODO find from routing table
-func (n *network) GetOutboundIP() (ip string, err error) {
-	conn, err := net.Dial("udp", "8.8.8.8:80")
+func (n *Network) OutboundIP(ctx context.Context) (ip string, err error) {
+	d := &net.Dialer{Timeout: time.Second}
+	conn, err := d.DialContext(ctx, "udp", "8.8.8.8:80")
 	if err != nil {
-		return "", fmt.Errorf("cannot get private IP address: %w", err)
+		return "", fmt.Errorf("%w: %s", ErrPrivateIP, err)
 	}
 	defer conn.Close()
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	return localAddr.IP.String(), nil
 }
 
-func (n *network) GetPublicIP() (ip string, err error) {
-	content, status, err := n.client.GetContent("https://diagnostic.opendns.com/myip")
+func (n *Network) PublicIP(ctx context.Context) (ip string, err error) {
+	netIP, err := n.pubipFetcher.IP(ctx)
 	if err != nil {
-		return "", fmt.Errorf("cannot get public IP address: %w", err)
-	} else if status != http.StatusOK {
-		return "", fmt.Errorf("cannot get public IP address: HTTP status code %d", status)
+		return "", err
 	}
-	ip = strings.TrimSpace(string(content))
-	ip = strings.TrimPrefix(ip, "\n")
-	ip = strings.TrimSuffix(ip, "\n")
-	if ip == "" {
-		return "", fmt.Errorf("Public IP address not found")
-	}
-	return ip, nil
+	return netIP.String(), nil
 }

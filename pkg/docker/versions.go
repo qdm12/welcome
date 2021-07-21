@@ -1,9 +1,13 @@
 package docker
 
-import "context"
+import (
+	"context"
+	"os/exec"
+)
 
 func (d *docker) Version(ctx context.Context) string {
-	version, err := d.commander.Run(ctx, "docker", "version", "--format", "'{{.Server.Version}}'")
+	cmd := exec.CommandContext(ctx, "docker", "version", "--format", "'{{.Server.Version}}'")
+	version, err := d.commander.Run(cmd)
 	if err != nil {
 		return "N/A"
 	}
@@ -11,7 +15,8 @@ func (d *docker) Version(ctx context.Context) string {
 }
 
 func (d *docker) ComposeVersion(ctx context.Context) string {
-	version, err := d.commander.Run(ctx, "docker-compose", "version", "--short")
+	cmd := exec.CommandContext(ctx, "docker-compose", "version", "--short")
+	version, err := d.commander.Run(cmd)
 	if err != nil {
 		return "N/A"
 	}

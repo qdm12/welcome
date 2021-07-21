@@ -1,23 +1,34 @@
 package network
 
 import (
-	"time"
+	"context"
+	"net"
 
-	netlib "github.com/qdm12/golibs/network"
+	"github.com/qdm12/ddns-updater/pkg/publicip"
+	"github.com/qdm12/golibs/connectivity"
 )
 
-type Network interface {
-	GetOutboundIP() (ip string, err error)
-	GetPublicIP() (ip string, err error)
-	CheckMultipleHTTPConnections(urls []string) (errors []error)
+var _ NetworkInterface = new(Network)
+
+type NetworkInterface interface {
+	OutboundIP(ctx context.Context) (ip string, err error)
+	PublicIP(ctx context.Context) (ip string, err error)
+	Check(ctx context.Context, urls []string) (errors []error)
 }
 
-type network struct {
-	client netlib.Client
+type Network struct {
+	pubipFetcher publicip.Fetcher
+	connChecker  connectivity.Checker
 }
 
-func New() Network {
-	return &network{
-		client: netlib.NewClient(time.Second),
+func New(resolver *net.Resolver) (n *Network, err error) {
+	pubipFetcher, err := publicip.NewFetcher(
+		publicip.DNSSettings{Enabled: true}, publicip.HTTPSettings{})
+	if err != nil {
+		return nil, err
 	}
+	return &Network{
+		pubipFetcher: pubipFetcher,
+		connChecker:  connectivity.NewDNSChecker(resolver),
+	}, nil
 }

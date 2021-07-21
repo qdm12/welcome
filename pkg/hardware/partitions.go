@@ -3,6 +3,7 @@ package hardware
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"strconv"
 	"strings"
 )
@@ -21,7 +22,8 @@ func (hw *hardware) PartitionsUsage(ctx context.Context) (partitionsUsage map[st
 }
 
 func (hw *hardware) getDrivesRawMetadata(ctx context.Context) (lines []string, err error) {
-	output, err := hw.cmd.Run(ctx, "df", "-T")
+	cmd := exec.CommandContext(ctx, "df", "-T")
+	output, err := hw.cmd.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get drives raw metadata: %w", err)
 	}
