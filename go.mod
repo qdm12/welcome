@@ -15,7 +15,7 @@ require (
 	github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/qdm12/ddns-updater v0.0.0-20210720152241-86f559c0b3c4
-	github.com/qdm12/golibs v0.0.0-20210721181753-0b3950ed4d2d
+	github.com/qdm12/golibs v0.0.0-20210721223530-ec1d3fe6dc99
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	golang.org/x/time v0.0.0-20210611083556-38a9dc6acbc6 // indirect
 	google.golang.org/grpc v1.39.0 // indirect
