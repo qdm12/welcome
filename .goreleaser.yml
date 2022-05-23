@@ -12,7 +12,7 @@ builds:
       - arm64
       - arm
     goarm:
-      - 7
+      - "7"
 archives:
   - format: binary
 checksum:
