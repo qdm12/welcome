@@ -24,15 +24,19 @@ type Hardware interface {
 }
 
 type hardware struct {
-	cmd            command.Commander
+	commander      Commander
 	dockerRootPath string
 	readProcStat   func(path string) (*linux.Stat, error)
 	getSysInfo     func() *sysinfo.SI
 }
 
-func New(cmd command.Commander, dockerRootPath string) Hardware {
+type Commander interface {
+	Run(cmd command.ExecCmd) (output string, err error)
+}
+
+func New(cmd Commander, dockerRootPath string) Hardware {
 	return &hardware{
-		cmd:            cmd,
+		commander:      cmd,
 		dockerRootPath: dockerRootPath,
 		readProcStat:   linux.ReadStat,
 		getSysInfo:     sysinfo.Get,

@@ -19,11 +19,15 @@ type Docker interface {
 }
 
 type docker struct {
-	commander command.Commander
+	commander Commander
 	client    client.APIClient
 }
 
-func New(commander command.Commander) (
+type Commander interface {
+	Run(cmd command.ExecCmd) (output string, err error)
+}
+
+func New(commander Commander) (
 	d Docker, err error) {
 	dockerClient, err := client.NewClientWithOpts()
 	if err != nil {

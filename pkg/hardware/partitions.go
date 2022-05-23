@@ -23,7 +23,7 @@ func (hw *hardware) PartitionsUsage(ctx context.Context) (partitionsUsage map[st
 
 func (hw *hardware) getDrivesRawMetadata(ctx context.Context) (lines []string, err error) {
 	cmd := exec.CommandContext(ctx, "df", "-T")
-	output, err := hw.cmd.Run(cmd)
+	output, err := hw.commander.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get drives raw metadata: %w", err)
 	}

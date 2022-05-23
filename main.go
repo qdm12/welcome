@@ -35,7 +35,7 @@ func _main(ctx context.Context) int {
 	websitesToCheck := strings.Split(*websitesToCheckFlag, ",")
 
 	display := display.New()
-	cmd := command.NewCommander()
+	cmd := command.NewCmder()
 	docker, err := docker.New(cmd)
 	if err != nil {
 		display.Error(err)
