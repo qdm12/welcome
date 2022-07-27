@@ -8,10 +8,13 @@ import (
 	"time"
 )
 
-var ErrPrivateIP = errors.New("cannot get private IP address")
+var (
+	ErrPrivateIP       = errors.New("cannot get private IP address")
+	ErrLocalAddrNotUDP = errors.New("local address is not UDP")
+)
 
-// Get preferred outbound ip of this machine
-// TODO find from routing table
+// OutboundIP obtains the preferred outbound ip of this machine.
+// TODO find from routing table.
 func (n *Network) OutboundIP(ctx context.Context) (ip string, err error) {
 	d := &net.Dialer{Timeout: time.Second}
 	conn, err := d.DialContext(ctx, "udp", "8.8.8.8:80")
@@ -19,7 +22,12 @@ func (n *Network) OutboundIP(ctx context.Context) (ip string, err error) {
 		return "", fmt.Errorf("%w: %s", ErrPrivateIP, err)
 	}
 	defer conn.Close()
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	localAddr, ok := conn.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		return "", fmt.Errorf("%w: %T", ErrLocalAddrNotUDP, conn.LocalAddr())
+	}
+
 	return localAddr.IP.String(), nil
 }
 

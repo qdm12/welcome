@@ -8,7 +8,7 @@ import (
 	"github.com/docker/docker/api/types"
 )
 
-func (d *docker) CountContainers(ctx context.Context) (count int, err error) {
+func (d *Docker) CountContainers(ctx context.Context) (count int, err error) {
 	containers, err := d.client.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
 		return 0, fmt.Errorf("cannot list Docker containers: %w", err)
@@ -16,7 +16,8 @@ func (d *docker) CountContainers(ctx context.Context) (count int, err error) {
 	return len(containers), err
 }
 
-func (d *docker) AreContainerRunning(ctx context.Context, requiredContainerNames []string) (containersNotRunning []string, err error) {
+func (d *Docker) AreContainerRunning(ctx context.Context, requiredContainerNames []string) (
+	containersNotRunning []string, err error) {
 	containers, err := d.client.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("cannot list Docker containers: %w", err)
@@ -35,7 +36,7 @@ func (d *docker) AreContainerRunning(ctx context.Context, requiredContainerNames
 	return containersNotRunning, nil
 }
 
-func (d *docker) BadContainers(ctx context.Context) (containerNameToState map[string]string, err error) {
+func (d *Docker) BadContainers(ctx context.Context) (containerNameToState map[string]string, err error) {
 	containers, err := d.client.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("cannot list Docker containers: %w", err)

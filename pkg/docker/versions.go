@@ -5,7 +5,7 @@ import (
 	"os/exec"
 )
 
-func (d *docker) Version(ctx context.Context) string {
+func (d *Docker) Version(ctx context.Context) string {
 	cmd := exec.CommandContext(ctx, "docker", "version", "--format", "'{{.Server.Version}}'")
 	version, err := d.commander.Run(cmd)
 	if err != nil {
@@ -14,7 +14,7 @@ func (d *docker) Version(ctx context.Context) string {
 	return version
 }
 
-func (d *docker) ComposeVersion(ctx context.Context) string {
+func (d *Docker) ComposeVersion(ctx context.Context) string {
 	cmd := exec.CommandContext(ctx, "docker-compose", "version", "--short")
 	version, err := d.commander.Run(cmd)
 	if err != nil {

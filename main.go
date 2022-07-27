@@ -24,11 +24,41 @@ func main() {
 	os.Exit(_main(context.Background()))
 }
 
+type (
+	Hardware interface {
+		PartitionsUsage(ctx context.Context) (partitionsUsage map[string]int, warnings []string, err error)
+		IsZpoolInstalled(ctx context.Context) bool
+		GetPools(ctx context.Context) (poolNames []string, err error)
+		GetPoolHealth(ctx context.Context, poolName string) (health string, err error)
+		GetPoolErrors(ctx context.Context, poolName string) (errors string, err error)
+		GetPoolCapacity(ctx context.Context, poolName string) (capacity int, err error)
+	}
+
+	Docker interface {
+		IsRunning(ctx context.Context) (running bool)
+		IsComposeInstalled(ctx context.Context) (installed bool)
+		Version(ctx context.Context) string
+		ComposeVersion(ctx context.Context) string
+		CountContainers(ctx context.Context) (count int, err error)
+		AreContainerRunning(ctx context.Context, requiredContainerNames []string) (containersNotRunning []string, err error)
+		BadContainers(ctx context.Context) (containerNameToState map[string]string, err error)
+	}
+
+	Display interface {
+		Error(arg ...interface{})
+		Warning(arg ...interface{})
+		FormatRandomASCIIArt(s string) string
+	}
+)
+
 func _main(ctx context.Context) int {
 	networkFlag := flag.Bool("network", false, "verify network connectivity")
 	composeFlag := flag.Bool("compose", false, "show docker-compose version (slow)")
-	requiredContainerNamesFlag := flag.String("requiredContainers", "dns,ddns", "comma separated list of required running container names to check for")
-	websitesToCheckFlag := flag.String("websitesToCheck", "https://qqq.ninja,https://1.1.1.1", "comma separated list of websites to check, only enabled if --network is specified")
+	requiredContainerNamesFlag := flag.String("requiredContainers", "dns,ddns",
+		"comma separated list of required running container names to check for")
+	websitesToCheckFlag := flag.String("websitesToCheck",
+		"https://qqq.ninja,https://1.1.1.1",
+		"comma separated list of websites to check, only enabled if --network is specified")
 	flag.Parse()
 
 	requiredContainerNames := strings.Split(*requiredContainerNamesFlag, ",")
@@ -113,7 +143,7 @@ func _main(ctx context.Context) int {
 	return 0
 }
 
-func hostname(display display.Display) {
+func hostname(display Display) {
 	bytes, err := ioutil.ReadFile("/proc/sys/kernel/hostname")
 	if err != nil {
 		display.Error("Cannot get hostname: %s", err)
@@ -125,7 +155,7 @@ func hostname(display display.Display) {
 	fmt.Println(display.FormatRandomASCIIArt(hostname))
 }
 
-func zfs(ctx context.Context, hardware hardware.Hardware, display display.Display) {
+func zfs(ctx context.Context, hardware Hardware, display Display) {
 	if !hardware.IsZpoolInstalled(ctx) {
 		return
 	}
@@ -156,7 +186,7 @@ func zfs(ctx context.Context, hardware hardware.Hardware, display display.Displa
 	fmt.Println(strings.Join(capacities, " | "))
 }
 
-func partitions(ctx context.Context, hardware hardware.Hardware, display display.Display) {
+func partitions(ctx context.Context, hardware Hardware, display Display) {
 	partitionsUsage, warnings, err := hardware.PartitionsUsage(ctx)
 	for _, warning := range warnings {
 		display.Warning(warning)
@@ -173,7 +203,8 @@ func partitions(ctx context.Context, hardware hardware.Hardware, display display
 	}
 }
 
-func doDocker(ctx context.Context, docker docker.Docker, display display.Display, composeCheck bool, requiredContainerNames []string) {
+func doDocker(ctx context.Context, docker Docker, display Display,
+	composeCheck bool, requiredContainerNames []string) {
 	if !docker.IsRunning(ctx) {
 		display.Error("Docker is not running")
 		return
@@ -195,11 +226,7 @@ func doDocker(ctx context.Context, docker docker.Docker, display display.Display
 			display.Warning("Docker-Compose is not installed")
 		} else {
 			dockerComposeVersion := docker.ComposeVersion(ctx)
-			if err != nil {
-				display.Error("Cannot get docker-compose version: %s", err)
-			} else {
-				dockerData = append(dockerData, "Compose "+dockerComposeVersion)
-			}
+			dockerData = append(dockerData, "Compose "+dockerComposeVersion)
 		}
 	}
 	fmt.Println(strings.Join(dockerData, " | "))
@@ -220,8 +247,8 @@ func doDocker(ctx context.Context, docker docker.Docker, display display.Display
 	}
 }
 
-func doNetwork(ctx context.Context, display display.Display,
-	network network.NetworkInterface, websitesToCheck []string) {
+func doNetwork(ctx context.Context, display Display,
+	network network.Interface, websitesToCheck []string) {
 	var netData []string
 	privateIP, err := network.OutboundIP(ctx)
 	if err != nil {

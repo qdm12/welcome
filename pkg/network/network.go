@@ -8,9 +8,9 @@ import (
 	"github.com/qdm12/golibs/connectivity"
 )
 
-var _ NetworkInterface = new(Network)
+var _ Interface = new(Network)
 
-type NetworkInterface interface {
+type Interface interface {
 	OutboundIP(ctx context.Context) (ip string, err error)
 	PublicIP(ctx context.Context) (ip string, err error)
 	Check(ctx context.Context, urls []string) (errors []error)

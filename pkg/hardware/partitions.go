@@ -2,13 +2,15 @@ package hardware
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strconv"
 	"strings"
 )
 
-func (hw *hardware) PartitionsUsage(ctx context.Context) (partitionsUsage map[string]int, warnings []string, err error) {
+func (hw *Hardware) PartitionsUsage(ctx context.Context) (
+	partitionsUsage map[string]int, warnings []string, err error) {
 	lines, err := hw.getDrivesRawMetadata(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -21,7 +23,7 @@ func (hw *hardware) PartitionsUsage(ctx context.Context) (partitionsUsage map[st
 	return partitionsUsage, warnings, nil
 }
 
-func (hw *hardware) getDrivesRawMetadata(ctx context.Context) (lines []string, err error) {
+func (hw *Hardware) getDrivesRawMetadata(ctx context.Context) (lines []string, err error) {
 	cmd := exec.CommandContext(ctx, "df", "-T")
 	output, err := hw.commander.Run(cmd)
 	if err != nil {
@@ -38,7 +40,7 @@ type partitionData struct {
 	mountedOn     string
 }
 
-func (hw *hardware) processPartitionsRawMetadata(lines []string) (partitions []partitionData, warnings []string) {
+func (hw *Hardware) processPartitionsRawMetadata(lines []string) (partitions []partitionData, warnings []string) {
 	for _, line := range lines {
 		if partitionRawDataShouldBeSkipped(line, []string{hw.dockerRootPath}) {
 			continue
@@ -53,10 +55,16 @@ func (hw *hardware) processPartitionsRawMetadata(lines []string) (partitions []p
 	return partitions, warnings
 }
 
+var (
+	ErrExtractPartitionInformation = errors.New("cannot extract partition information")
+)
+
 func makePartitionData(line string) (data partitionData, err error) {
 	columns := strings.Fields(line)
-	if len(columns) < 7 {
-		return data, fmt.Errorf("cannot extract partition information: %q has less than 7 columns", line)
+	const minColumns = 7
+	if len(columns) < minColumns {
+		return data, fmt.Errorf("%w: %q has less than %d columns",
+			ErrExtractPartitionInformation, line, minColumns)
 	}
 	data.filesystem = columns[0]
 	data.partitionType = columns[1]
@@ -71,7 +79,9 @@ func makePartitionData(line string) (data partitionData, err error) {
 
 func partitionRawDataShouldBeSkipped(line string, ignoredMountPoints []string) (skip bool) {
 	CIFSEncryptedShare := strings.HasPrefix(line, "//")
-	isBootMountpoint := strings.HasSuffix(line, "/boot/efi") || strings.HasSuffix(line, "/boot") || strings.HasSuffix(line, "/efi")
+	isBootMountpoint := strings.HasSuffix(line, "/boot/efi") ||
+		strings.HasSuffix(line, "/boot") ||
+		strings.HasSuffix(line, "/efi")
 	isCIFS := strings.Contains(line, " cifs ")
 	switch {
 	case len(line) == 0, CIFSEncryptedShare, isBootMountpoint, isCIFS:

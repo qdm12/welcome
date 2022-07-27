@@ -7,13 +7,13 @@ import (
 	"strconv"
 )
 
-func (hw *hardware) IsZpoolInstalled(ctx context.Context) bool {
+func (hw *Hardware) IsZpoolInstalled(ctx context.Context) bool {
 	cmd := exec.CommandContext(ctx, "zpool", "version")
 	_, err := hw.commander.Run(cmd)
 	return err == nil
 }
 
-func (hw *hardware) GetPools(ctx context.Context) (poolNames []string, err error) {
+func (hw *Hardware) GetPools(ctx context.Context) (poolNames []string, err error) {
 	cmd := exec.CommandContext(ctx, "zpool", "list", "-o", "name", "-H")
 	output, err := hw.commander.Run(cmd)
 	if err != nil {
@@ -23,7 +23,7 @@ func (hw *hardware) GetPools(ctx context.Context) (poolNames []string, err error
 	return poolNames, nil
 }
 
-func (hw *hardware) GetPoolHealth(ctx context.Context, poolName string) (health string, err error) {
+func (hw *Hardware) GetPoolHealth(ctx context.Context, poolName string) (health string, err error) {
 	cmd := exec.CommandContext(ctx, "zpool", "list", poolName, "-o", "health", "-H")
 	health, err = hw.commander.Run(cmd)
 	if err != nil {
@@ -35,7 +35,7 @@ func (hw *hardware) GetPoolHealth(ctx context.Context, poolName string) (health 
 	return health, nil
 }
 
-func (hw *hardware) GetPoolErrors(ctx context.Context, poolName string) (errors string, err error) {
+func (hw *Hardware) GetPoolErrors(ctx context.Context, poolName string) (errors string, err error) {
 	cmd := exec.CommandContext(ctx, "zpool", "status", poolName)
 	poolStatus, err := hw.commander.Run(cmd)
 	if err != nil {
@@ -50,7 +50,7 @@ func (hw *hardware) GetPoolErrors(ctx context.Context, poolName string) (errors 
 	return errors, nil
 }
 
-func (hw *hardware) GetPoolCapacity(ctx context.Context, poolName string) (capacity int, err error) {
+func (hw *Hardware) GetPoolCapacity(ctx context.Context, poolName string) (capacity int, err error) {
 	cmd := exec.CommandContext(ctx, "zpool", "list", poolName, "-o", "capacity", "-H")
 	output, err := hw.commander.Run(cmd)
 	if err != nil {

@@ -5,7 +5,7 @@ import (
 	"github.com/fatih/color"
 )
 
-func (d *display) FormatASCIIArt(s, font string) string {
+func (d *Display) FormatASCIIArt(s, font string) string {
 	if !fontExists(font) {
 		d.Warning("Font " + font + " does not exist, picking a random one")
 		return d.FormatRandomASCIIArt(s)
@@ -15,7 +15,7 @@ func (d *display) FormatASCIIArt(s, font string) string {
 	return asciiArt
 }
 
-func (d *display) FormatRandomASCIIArt(s string) string {
+func (d *Display) FormatRandomASCIIArt(s string) string {
 	fonts := allPossibleFonts()
 	font := fonts[d.randIntn(len(fonts))]
 	asciiArt := d.FormatASCIIArt(s, font)
@@ -23,7 +23,7 @@ func (d *display) FormatRandomASCIIArt(s string) string {
 	return asciiArt
 }
 
-func (d *display) FormatRandomBestASCIIArt(s string) string {
+func (d *Display) FormatRandomBestASCIIArt(s string) string {
 	fonts := bestFonts()
 	font := fonts[d.randIntn(len(fonts))]
 	return d.FormatASCIIArt(s, font)
