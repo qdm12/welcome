@@ -2,17 +2,19 @@ before:
   hooks:
     - go mod download
 builds:
-  - env:
+  - main: ./main.go
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+    env:
       - CGO_ENABLED=0
-    goos:
-      - linux
-    goarch:
-      - "386"
-      - amd64
-      - arm64
-      - arm
-    goarm:
-      - "7"
+    targets:
+      # See https://goreleaser.com/customization/build/
+      - linux_amd64
+      - linux_386
+      - linux_arm64
+      - linux_arm_7
 archives:
   - format: binary
 checksum:
