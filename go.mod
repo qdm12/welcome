@@ -9,7 +9,7 @@ require (
 	github.com/docker/docker v20.10.7+incompatible
 	github.com/fatih/color v1.12.0
 	github.com/qdm12/ddns-updater v0.0.0-20220315143516-584597d5cb8c
-	github.com/qdm12/golibs v0.0.0-20210915134941-19815c6f95fe
+	github.com/qdm12/golibs v0.0.0-20220805004458-487c8154f7ab
 )
 
 require (
