@@ -36,7 +36,6 @@ type (
 
 	Docker interface {
 		IsRunning(ctx context.Context) (running bool)
-		IsComposeInstalled(ctx context.Context) (installed bool)
 		Version(ctx context.Context) string
 		ComposeVersion(ctx context.Context) string
 		CountContainers(ctx context.Context) (count int, err error)
@@ -222,10 +221,10 @@ func doDocker(ctx context.Context, docker Docker, display Display,
 		dockerData = append(dockerData, fmt.Sprintf("%d containers", containersCount))
 	}
 	if composeCheck {
-		if !docker.IsComposeInstalled(ctx) {
-			display.Warning("Docker-Compose is not installed")
+		dockerComposeVersion := docker.ComposeVersion(ctx)
+		if dockerComposeVersion == "" {
+			display.Warning("Docker Compose is not installed")
 		} else {
-			dockerComposeVersion := docker.ComposeVersion(ctx)
 			dockerData = append(dockerData, "Compose "+dockerComposeVersion)
 		}
 	}
